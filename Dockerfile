@@ -48,9 +48,17 @@ RUN mkdir -p "${WINEPREFIX}" && chown -R "${PUID}:${PGID}" "${WINEPREFIX}" \
     && rm -rf /tmp/wine-* \
     && chown -R "${PUID}:${PGID}" "${WINEPREFIX}"
 
-# Create persistent data directory and link Mp3tag config for persistence
+# Seed the initial Mp3tag config into /pw/initial/config so the entrypoint
+# can copy it to /mp3tag-web/config on first run (volume mount).
+# The silent installer may not create AppData/Mp3tag until first launch,
+# so we create the directory if it doesn't exist yet.
+RUN mkdir -p /pw/initial/config \
+    && mkdir -p "${WINEPREFIX}/drive_c/users/gwb/AppData/Roaming/Mp3tag" \
+    && cp -a "${WINEPREFIX}/drive_c/users/gwb/AppData/Roaming/Mp3tag/." /pw/initial/config/ \
+    && chown -R "${PUID}:${PGID}" /pw/initial/config
+
+# Create persistent data directory
 RUN mkdir -p /mp3tag-web \
-    && mkdir -p /pw/initial \
     && chown -R "${PUID}:${PGID}" /mp3tag-web
 
 # Configure xpra window handling for Mp3tag

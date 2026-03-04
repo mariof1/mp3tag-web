@@ -11,4 +11,13 @@ for dir in /pw/initial/*/; do
     fi
 done
 
+# Symlink the Wine Mp3tag config directory to /mp3tag-web/config so settings
+# are persisted on the host-mounted volume across container restarts.
+MP3TAG_APPDATA="${WINEPREFIX}/drive_c/users/gwb/AppData/Roaming/Mp3tag"
+if [ ! -L "$MP3TAG_APPDATA" ]; then
+    rm -rf "$MP3TAG_APPDATA"
+    mkdir -p "$(dirname "$MP3TAG_APPDATA")"
+    ln -sf /mp3tag-web/config "$MP3TAG_APPDATA"
+fi
+
 exec /gwb/entrypoint.sh "$@"
