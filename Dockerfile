@@ -56,6 +56,12 @@ RUN mkdir -p /mp3tag-web \
 # Configure xpra window handling for Mp3tag
 RUN configure-xpra --content-type "title:Mp3tag=text" 2>/dev/null || true
 
+# Use 1280x720 virtual display so xpra positions the workspace at (0,0) in the browser
+RUN mkdir -p /home/gwb/.xpra \
+    && echo 'xvfb = Xvfb +extension GLX +extension Composite +extension RANDR +extension RENDER -extension DOUBLE-BUFFER -screen 0 1280x720x24+32 -nolisten tcp -noreset -auth $XAUTHORITY' \
+        >> /home/gwb/.xpra/xpra.conf \
+    && chown -R "${PUID}:${PGID}" /home/gwb/.xpra
+
 # Wrapper script to launch Mp3tag (avoids arg-joining issue in start-app)
 COPY scripts/run-mp3tag.sh /pw/run-mp3tag.sh
 RUN chmod +x /pw/run-mp3tag.sh
