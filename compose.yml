@@ -6,6 +6,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        INCLUDE_TELEGRAM: ${INCLUDE_TELEGRAM:-true}
     container_name: mp3tag-web
     restart: unless-stopped
     ports:
@@ -15,3 +17,5 @@ services:
     volumes:
       - ${V_CONFIG_DIR:-./data}:/mp3tag-web:rw
       - ${V_MUSIC_DIR:-./music}:/music:rw
+      - ${V_DOWNLOADS_DIR:-./downloads}:/downloads:rw
+      - ${V_TELEGRAM_DATA:-./telegram-data}:/home/gwb/.local/share/TelegramDesktop:rw

@@ -4,10 +4,13 @@ LABEL org.opencontainers.image.authors="mariof1" \
     org.opencontainers.image.license="MIT" \
     org.opencontainers.image.url="https://github.com/mariof1/mp3tag-web" \
     org.opencontainers.image.title="Mp3tag Web" \
-    org.opencontainers.image.description="Image to run Mp3tag in the browser"
+    org.opencontainers.image.description="Image to run Mp3tag (and optionally Telegram) in the browser"
 
 # Directories for upstream image to set correct permissions
-ENV APP_DIRS="/pw /mp3tag-web"
+ENV APP_DIRS="/pw /mp3tag-web /downloads"
+
+# Set to false at build time to skip Telegram Desktop installation
+ARG INCLUDE_TELEGRAM=true
 
 # Wine configuration
 ENV WINEPREFIX=/home/gwb/.wine
@@ -57,9 +60,29 @@ RUN mkdir -p /pw/initial/config \
     && cp -a "${WINEPREFIX}/drive_c/users/gwb/AppData/Roaming/Mp3tag/." /pw/initial/config/ \
     && chown -R "${PUID}:${PGID}" /pw/initial/config
 
-# Create persistent data directory
-RUN mkdir -p /mp3tag-web \
-    && chown -R "${PUID}:${PGID}" /mp3tag-web
+# Create persistent data and downloads directories
+RUN mkdir -p /mp3tag-web /downloads \
+    && chown -R "${PUID}:${PGID}" /mp3tag-web /downloads
+
+# Install Telegram Desktop (optional, controlled by INCLUDE_TELEGRAM build arg)
+# Uses the official Telegram Linux binary tarball (self-contained)
+ARG TELEGRAM_VERSION=6.6.2
+RUN if [ "${INCLUDE_TELEGRAM}" = "true" ]; then \
+        apt-get update \
+        && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libxcb-keysyms1 libxcb-icccm4 libxcb-image0 libxcb-randr0 \
+            libxcb-render-util0 libxcb-xfixes0 libxcb-xkb1 libxkbcommon-x11-0 \
+            xz-utils \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/* \
+        && wget -q \
+            "https://github.com/telegramdesktop/tdesktop/releases/download/v${TELEGRAM_VERSION}/tsetup.${TELEGRAM_VERSION}.tar.xz" \
+            -O /tmp/tsetup.tar.xz \
+        && mkdir -p /opt/telegram \
+        && tar xf /tmp/tsetup.tar.xz -C /opt/telegram --strip-components=1 \
+        && ln -sf /opt/telegram/Telegram /usr/local/bin/telegram-desktop \
+        && rm /tmp/tsetup.tar.xz; \
+    fi
 
 # Configure xpra window handling for Mp3tag
 RUN configure-xpra --content-type "title:Mp3tag=text" 2>/dev/null || true
@@ -70,7 +93,11 @@ RUN mkdir -p /home/gwb/.xpra \
         >> /home/gwb/.xpra/xpra.conf \
     && chown -R "${PUID}:${PGID}" /home/gwb/.xpra
 
-# Wrapper script to launch Mp3tag (avoids arg-joining issue in start-app)
+# Wrapper script to launch all apps (avoids arg-joining issue in start-app)
+COPY scripts/run-all.sh /pw/run-all.sh
+RUN chmod +x /pw/run-all.sh
+
+# Keep run-mp3tag.sh for reference / standalone use
 COPY scripts/run-mp3tag.sh /pw/run-mp3tag.sh
 RUN chmod +x /pw/run-mp3tag.sh
 
@@ -86,4 +113,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD /pw/healthcheck.sh
 
 ENTRYPOINT ["/pw/entrypoint.sh"]
-CMD ["start-app", "--title", "Mp3tag Web", "/pw/run-mp3tag.sh"]
+CMD ["start-app", "--title", "Mp3tag Web", "/pw/run-all.sh"]
