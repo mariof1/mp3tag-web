@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.authors="mariof1" \
     org.opencontainers.image.description="Image to run Mp3tag (and optionally Telegram) in the browser"
 
 # Directories for upstream image to set correct permissions
-ENV APP_DIRS="/pw /mp3tag-web /downloads"
+ENV APP_DIRS="/pw /mp3tag-web /downloads /home/gwb/.local/share/TelegramDesktop"
 
 # Set to false at build time to skip Telegram Desktop installation
 ARG INCLUDE_TELEGRAM=true

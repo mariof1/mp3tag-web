@@ -9,6 +9,8 @@ export DISPLAY="${DISPLAY:-:100}"
 
 # Start Telegram Desktop if installed and not explicitly disabled
 if [ "${TELEGRAM_ENABLED:-true}" = "true" ] && command -v telegram-desktop >/dev/null 2>&1; then
+    # Disable OpenGL hardware acceleration (no GPU in container)
+    export QT_OPENGL=software
     telegram-desktop &
 fi
 
