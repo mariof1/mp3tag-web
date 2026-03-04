@@ -3,6 +3,10 @@
 # Telegram Desktop runs in the background; Mp3tag is the primary (foreground) app.
 # xpra seamless mode shows both as separate windows in the same browser tab.
 
+# Ensure X11 auth is available for background processes
+export XAUTHORITY="${XAUTHORITY:-/home/gwb/.Xauthority}"
+export DISPLAY="${DISPLAY:-:100}"
+
 # Start Telegram Desktop if installed and not explicitly disabled
 if [ "${TELEGRAM_ENABLED:-true}" = "true" ] && command -v telegram-desktop >/dev/null 2>&1; then
     telegram-desktop &

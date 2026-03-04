@@ -72,7 +72,7 @@ RUN if [ "${INCLUDE_TELEGRAM}" = "true" ]; then \
         && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             libxcb-keysyms1 libxcb-icccm4 libxcb-image0 libxcb-randr0 \
             libxcb-render-util0 libxcb-xfixes0 libxcb-xkb1 libxkbcommon-x11-0 \
-            xz-utils \
+            libxcb-cursor0 xz-utils \
         && apt-get clean \
         && rm -rf /var/lib/apt/lists/* \
         && wget -q \
