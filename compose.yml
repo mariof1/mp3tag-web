@@ -1,0 +1,17 @@
+name: mp3tag-web
+
+services:
+  mp3tag-web:
+    image: mariof1/mp3tag-web:${MP3TAG_WEB_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mp3tag-web
+    restart: unless-stopped
+    ports:
+      - 8080:5000
+    env_file:
+      - .env
+    volumes:
+      - ${V_CONFIG_DIR:-./data}:/mp3tag-web:rw
+      - ${V_MUSIC_DIR:-./music}:/music:rw
