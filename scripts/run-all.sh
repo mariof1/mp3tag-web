@@ -7,37 +7,47 @@
 export XAUTHORITY="${XAUTHORITY:-/home/gwb/.Xauthority}"
 export DISPLAY="${DISPLAY:-:100}"
 
+start_telegram() {
+    export QT_OPENGL=software
+    export LANG=C.UTF-8
+    telegram-desktop >/dev/null 2>&1 &
+    echo $!
+}
+
 # Start Telegram Desktop if installed and not explicitly disabled
 if [ "${TELEGRAM_ENABLED:-true}" = "true" ] && command -v telegram-desktop >/dev/null 2>&1; then
-    # Disable OpenGL hardware acceleration (no GPU in container)
-    export QT_OPENGL=software
-    telegram-desktop &
-    TELEGRAM_PID=$!
+    TELEGRAM_PID=$(start_telegram)
 
-    # Monitor: auto-restore Telegram if it hides to the system tray.
-    # Telegram's close button minimizes to tray (30x30 icon) instead of quitting.
-    # This loop detects when the main window disappears and re-maps it.
+    # Monitor: detect when Telegram hides to system tray and restart it.
+    # Telegram's close button minimizes to tray (30x30 icon) — the window becomes
+    # unmapped and xpra can't properly re-render it. The cleanest fix is to restart
+    # Telegram when this happens, which gives xpra a fresh window to manage.
     (
-        sleep 10  # wait for initial window creation
-        while kill -0 $TELEGRAM_PID 2>/dev/null; do
-            # Find the main Telegram window (not the tray icon which is 30x30)
-            MAIN_WID=""
-            for wid in $(xdotool search --pid $TELEGRAM_PID 2>/dev/null); do
+        sleep 12  # wait for initial window creation
+        while true; do
+            if ! kill -0 $TELEGRAM_PID 2>/dev/null; then
+                # Telegram process died — restart it
+                sleep 2
+                TELEGRAM_PID=$(start_telegram)
+                sleep 10
+                continue
+            fi
+            # Check if main window (>100px wide) is still visible
+            VISIBLE=""
+            for wid in $(xdotool search --onlyvisible --pid $TELEGRAM_PID 2>/dev/null); do
                 W=$(xdotool getwindowgeometry --shell $wid 2>/dev/null | grep WIDTH | cut -d= -f2)
                 if [ -n "$W" ] && [ "$W" -gt 100 ] 2>/dev/null; then
-                    MAIN_WID=$wid
+                    VISIBLE=1
                     break
                 fi
             done
-            if [ -z "$MAIN_WID" ]; then
-                # Main window gone (hidden to tray) - find and re-map it
-                for wid in $(xdotool search --pid $TELEGRAM_PID 2>/dev/null); do
-                    NAME=$(xdotool getwindowname $wid 2>/dev/null)
-                    case "$NAME" in *Telegram*|*telegram*)
-                        xdotool windowmap $wid 2>/dev/null
-                        xdotool windowactivate $wid 2>/dev/null
-                    ;; esac
-                done
+            if [ -z "$VISIBLE" ]; then
+                # Main window hidden to tray — kill and restart for clean rendering
+                kill $TELEGRAM_PID 2>/dev/null
+                wait $TELEGRAM_PID 2>/dev/null
+                sleep 1
+                TELEGRAM_PID=$(start_telegram)
+                sleep 10
             fi
             sleep 3
         done

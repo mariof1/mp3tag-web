@@ -87,14 +87,20 @@ RUN if [ "${INCLUDE_TELEGRAM}" = "true" ]; then \
 # Configure xpra window handling for Mp3tag
 RUN configure-xpra --content-type "title:Mp3tag=text" 2>/dev/null || true
 
-# Use 1280x720 virtual display so xpra positions the workspace at (0,0) in the browser
-# Force header-bar on all windows (Telegram uses CSD with decorations=0, making it undraggable)
+# Enable resize-display so xpra dynamically adapts the virtual display to the browser viewport
+# This allows windows to maximize to the full browser size rather than being limited to a fixed resolution
 RUN mkdir -p /home/gwb/.xpra \
     && printf '%s\n' \
-        'xvfb = Xvfb +extension GLX +extension Composite +extension RANDR +extension RENDER -extension DOUBLE-BUFFER -screen 0 1280x720x24+32 -nolisten tcp -noreset -auth $XAUTHORITY' \
-        'header-bar = force' \
+        'resize-display = yes' \
         >> /home/gwb/.xpra/xpra.conf \
     && chown -R "${PUID}:${PGID}" /home/gwb/.xpra
+
+# Force header bar visible on undecorated windows (Telegram uses CSD with decorations=0)
+# The HTML5 client hides .windowhead via inline style for undecorated windows; !important overrides it
+RUN printf '\n%s\n' \
+        '.undecorated .windowhead { display: block !important; }' \
+        '.undecorated { border: 1px solid transparent; }' \
+        >> /usr/share/xpra/www/css/client.css
 
 # Wrapper script to launch all apps (avoids arg-joining issue in start-app)
 COPY scripts/run-all.sh /pw/run-all.sh
