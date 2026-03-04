@@ -13,6 +13,8 @@ ENV APP_DIRS="/pw /mp3tag-web"
 ENV WINEPREFIX=/home/gwb/.wine
 ENV WINEARCH=win32
 ENV WINEDEBUG=-all
+# Suppress Wine crash handler popup dialogs
+ENV WINE_DISABLE_CRASH_DIALOG=1
 
 EXPOSE 5000
 EXPOSE 5443
@@ -32,14 +34,15 @@ RUN dpkg --add-architecture i386 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Initialize Wine prefix, download and silently install Mp3tag
-RUN mkdir -p "${WINEPREFIX}" \
+# Initialize Wine prefix and install Mp3tag as the gwb user (avoids C:\users\root\ profile mismatch)
+RUN mkdir -p "${WINEPREFIX}" && chown -R "${PUID}:${PGID}" "${WINEPREFIX}" \
     && wget -q \
         --referer="https://www.mp3tag.de/en/download.html" \
         -O /tmp/mp3tag-setup.exe \
         "https://download.mp3tag.de/mp3tag-v${MP3TAG_VERSION}-setup.exe" \
-    && xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
-        sh -c "wine /tmp/mp3tag-setup.exe /S; sleep 8; wineserver -k 2>/dev/null; true" \
+    && chown "${PUID}:${PGID}" /tmp/mp3tag-setup.exe \
+    && gosu "${PUID}:${PGID}" xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
+        sh -c "wineboot --init && sleep 5 && wine /tmp/mp3tag-setup.exe /S; sleep 8; wineserver -k 2>/dev/null; true" \
     && test -f "${WINEPREFIX}/drive_c/Program Files/Mp3tag/Mp3tag.exe" \
     && rm /tmp/mp3tag-setup.exe \
     && rm -rf /tmp/wine-* \
