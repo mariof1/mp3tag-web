@@ -72,7 +72,7 @@ RUN if [ "${INCLUDE_TELEGRAM}" = "true" ]; then \
         && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             libxcb-keysyms1 libxcb-icccm4 libxcb-image0 libxcb-randr0 \
             libxcb-render-util0 libxcb-xfixes0 libxcb-xkb1 libxkbcommon-x11-0 \
-            libxcb-cursor0 xz-utils \
+            libxcb-cursor0 xz-utils xdotool \
         && apt-get clean \
         && rm -rf /var/lib/apt/lists/* \
         && wget -q \
@@ -88,8 +88,11 @@ RUN if [ "${INCLUDE_TELEGRAM}" = "true" ]; then \
 RUN configure-xpra --content-type "title:Mp3tag=text" 2>/dev/null || true
 
 # Use 1280x720 virtual display so xpra positions the workspace at (0,0) in the browser
+# Force header-bar on all windows (Telegram uses CSD with decorations=0, making it undraggable)
 RUN mkdir -p /home/gwb/.xpra \
-    && echo 'xvfb = Xvfb +extension GLX +extension Composite +extension RANDR +extension RENDER -extension DOUBLE-BUFFER -screen 0 1280x720x24+32 -nolisten tcp -noreset -auth $XAUTHORITY' \
+    && printf '%s\n' \
+        'xvfb = Xvfb +extension GLX +extension Composite +extension RANDR +extension RENDER -extension DOUBLE-BUFFER -screen 0 1280x720x24+32 -nolisten tcp -noreset -auth $XAUTHORITY' \
+        'header-bar = force' \
         >> /home/gwb/.xpra/xpra.conf \
     && chown -R "${PUID}:${PGID}" /home/gwb/.xpra
 
