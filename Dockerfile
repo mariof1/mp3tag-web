@@ -34,12 +34,15 @@ RUN dpkg --add-architecture i386 \
 
 # Initialize Wine prefix, download and silently install Mp3tag
 RUN mkdir -p "${WINEPREFIX}" \
-    && chown -R "${PUID}:${PGID}" "${WINEPREFIX}" \
-    && wget -q -O /tmp/mp3tag-setup.exe \
+    && wget -q \
+        --referer="https://www.mp3tag.de/en/download.html" \
+        -O /tmp/mp3tag-setup.exe \
         "https://download.mp3tag.de/mp3tag-v${MP3TAG_VERSION}-setup.exe" \
     && xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
-        sh -c "wineboot --init && sleep 3 && wine /tmp/mp3tag-setup.exe /S && sleep 5 && wineserver -k || true" \
+        sh -c "wine /tmp/mp3tag-setup.exe /S; sleep 8; wineserver -k 2>/dev/null; true" \
+    && test -f "${WINEPREFIX}/drive_c/Program Files/Mp3tag/Mp3tag.exe" \
     && rm /tmp/mp3tag-setup.exe \
+    && rm -rf /tmp/wine-* \
     && chown -R "${PUID}:${PGID}" "${WINEPREFIX}"
 
 # Create persistent data directory and link Mp3tag config for persistence
@@ -49,6 +52,10 @@ RUN mkdir -p /mp3tag-web \
 
 # Configure xpra window handling for Mp3tag
 RUN configure-xpra --content-type "title:Mp3tag=text" 2>/dev/null || true
+
+# Wrapper script to launch Mp3tag (avoids arg-joining issue in start-app)
+COPY scripts/run-mp3tag.sh /pw/run-mp3tag.sh
+RUN chmod +x /pw/run-mp3tag.sh
 
 # Entrypoint script
 COPY scripts/entrypoint.sh /pw/entrypoint.sh
@@ -62,4 +69,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD /pw/healthcheck.sh
 
 ENTRYPOINT ["/pw/entrypoint.sh"]
-CMD ["start-app", "--title", "Mp3tag Web", "wine", "C:\\Program Files\\Mp3tag\\Mp3tag.exe"]
+CMD ["start-app", "--title", "Mp3tag Web", "/pw/run-mp3tag.sh"]
