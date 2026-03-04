@@ -20,4 +20,20 @@ if [ ! -L "$MP3TAG_APPDATA" ]; then
     ln -sf /mp3tag-web/config "$MP3TAG_APPDATA"
 fi
 
+# Symlink ~/Downloads to /downloads so Telegram's default download path
+# ("Telegram folder in system «Downloads»") writes to the mounted volume.
+DOWNLOADS_DIR="/home/gwb/Downloads"
+if [ ! -L "$DOWNLOADS_DIR" ]; then
+    # Move any existing downloaded files into /downloads before replacing
+    if [ -d "$DOWNLOADS_DIR" ]; then
+        cp -a "$DOWNLOADS_DIR/." /downloads/ 2>/dev/null || true
+        rm -rf "$DOWNLOADS_DIR"
+    fi
+    ln -sf /downloads "$DOWNLOADS_DIR"
+fi
+
+# Ensure the Telegram Desktop subfolder exists so Mp3tag can open it on startup
+mkdir -p "/downloads/Telegram Desktop"
+chown "$PUID:$PGID" "/downloads/Telegram Desktop"
+
 exec /gwb/entrypoint.sh "$@"

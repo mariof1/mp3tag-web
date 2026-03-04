@@ -14,6 +14,6 @@ if [ "${TELEGRAM_ENABLED:-true}" = "true" ] && command -v telegram-desktop >/dev
     telegram-desktop &
 fi
 
-# Launch Mp3tag with /downloads as the default folder.
-# Wine's Z: drive maps to the Linux root, so /downloads -> Z:\downloads.
-exec wine "C:\\Program Files\\Mp3tag\\Mp3tag.exe" /fp:"Z:\\downloads"
+# Launch Mp3tag with /downloads/Telegram Desktop as the default folder.
+# Telegram saves files there by default; Wine Z: maps to Linux root.
+exec wine "C:\\Program Files\\Mp3tag\\Mp3tag.exe" /fp:"Z:\\downloads\\Telegram Desktop"
