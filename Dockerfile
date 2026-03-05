@@ -95,11 +95,17 @@ RUN mkdir -p /home/gwb/.xpra \
         >> /home/gwb/.xpra/xpra.conf \
     && chown -R "${PUID}:${PGID}" /home/gwb/.xpra
 
-# Force header bar visible on undecorated windows (Telegram uses CSD with decorations=0)
-# The HTML5 client hides .windowhead via inline style for undecorated windows; !important overrides it
-RUN printf '\n%s\n' \
-        '.undecorated .windowhead { display: block !important; }' \
-        '.undecorated { border: 1px solid transparent; }' \
+# Fix window decorations for non-standard windows (Telegram CSD with decorations=0).
+# Two-part fix:
+# 1. JS: Patch _set_decorated so non-override-redirect undecorated windows are treated
+#    as decorated. This ensures the header bar is shown AND the mouse-click offset
+#    calculation includes the header height (fixing mouse misalignment).
+# 2. CSS: Add a transparent border on undecorated non-OR windows for visual consistency.
+#    Override-redirect windows (menus, tooltips, popups) are left untouched.
+RUN WJS=/usr/share/xpra/www/js/Window.js && \
+    sed -i 's/_set_decorated(decorated){this.decorated=decorated;/_set_decorated(decorated){if(!decorated\&\&!this.override_redirect){decorated=true;}this.decorated=decorated;/' "$WJS" && \
+    printf '\n%s\n' \
+        '.undecorated:not(.override-redirect) { border: 1px solid transparent; }' \
         >> /usr/share/xpra/www/css/client.css
 
 # Wrapper script to launch all apps (avoids arg-joining issue in start-app)
