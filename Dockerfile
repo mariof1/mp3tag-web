@@ -54,13 +54,30 @@ RUN mkdir -p "${WINEPREFIX}" && chown -R "${PUID}:${PGID}" "${WINEPREFIX}" \
 # Install core Windows fonts via winetricks:
 #  - corefonts: Arial, Courier New, Times New Roman, Verdana, etc.
 #  - tahoma: Tahoma (default Windows UI font, not part of corefonts)
+# Also install Wine's own LGPL replacement fonts (Wingdings, Marlett, Symbol)
+# from the Wine source repository for proper icon/glyph rendering.
 RUN wget -q https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
         -O /usr/local/bin/winetricks \
     && chmod +x /usr/local/bin/winetricks \
     && gosu "${PUID}:${PGID}" xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
         sh -c 'winetricks -q corefonts tahoma; wineserver -k 2>/dev/null; true' \
+    && WINE_FONT_URL="https://gitlab.winehq.org/wine/wine/-/raw/master/fonts" \
+    && FONT_DIR="${WINEPREFIX}/drive_c/windows/Fonts" \
+    && for f in wingding.ttf marlett.ttf symbol.ttf; do \
+         wget -q "$WINE_FONT_URL/$f" -O "$FONT_DIR/$f"; \
+       done \
     && rm -rf /tmp/wine-* /home/gwb/.cache/winetricks \
     && chown -R "${PUID}:${PGID}" "${WINEPREFIX}"
+# Register Wine replacement fonts in the registry
+RUN gosu "${PUID}:${PGID}" xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
+        sh -c '\
+          wine reg add "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts" \
+            /v "Wingdings (TrueType)" /t REG_SZ /d wingding.ttf /f && \
+          wine reg add "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts" \
+            /v "Marlett (TrueType)" /t REG_SZ /d marlett.ttf /f && \
+          wine reg add "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts" \
+            /v "Symbol (TrueType)" /t REG_SZ /d symbol.ttf /f; \
+          wineserver -k 2>/dev/null; true'
 # can copy it to /mp3tag-web/config on first run (volume mount).
 # The silent installer may not create AppData/Mp3tag until first launch,
 # so we create the directory if it doesn't exist yet.
