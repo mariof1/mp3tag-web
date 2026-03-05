@@ -88,23 +88,27 @@ RUN if [ "${INCLUDE_TELEGRAM}" = "true" ]; then \
 RUN configure-xpra --content-type "title:Mp3tag=text" 2>/dev/null || true
 
 # Enable resize-display so xpra dynamically adapts the virtual display to the browser viewport
-# This allows windows to maximize to the full browser size rather than being limited to a fixed resolution
+# Set DPI explicitly for consistent coordinate mapping
 RUN mkdir -p /home/gwb/.xpra \
     && printf '%s\n' \
         'resize-display = yes' \
+        'dpi = 96' \
         >> /home/gwb/.xpra/xpra.conf \
     && chown -R "${PUID}:${PGID}" /home/gwb/.xpra
 
 # Fix window decorations for non-standard windows (Telegram CSD with decorations=0).
-# Two-part fix:
 # 1. JS: Patch _set_decorated so non-override-redirect undecorated windows are treated
 #    as decorated. This ensures the header bar is shown AND the mouse-click offset
 #    calculation includes the header height (fixing mouse misalignment).
-# 2. CSS: Add a transparent border on undecorated non-OR windows for visual consistency.
+# 2. CSS: Fix .windowhead to use border-box sizing so that its border-bottom (1px) is
+#    included in the 30px height — otherwise update_offsets() under-counts by 1px.
+#    Also add a transparent border on undecorated non-OR windows for visual consistency.
 #    Override-redirect windows (menus, tooltips, popups) are left untouched.
 RUN WJS=/usr/share/xpra/www/js/Window.js && \
     sed -i 's/_set_decorated(decorated){this.decorated=decorated;/_set_decorated(decorated){if(!decorated\&\&!this.override_redirect){decorated=true;}this.decorated=decorated;/' "$WJS" && \
+    sed -i 's/jQuery(this\.d_header)\.css("height")/jQuery(this.d_header).outerHeight()/' "$WJS" && \
     printf '\n%s\n' \
+        '.windowhead { box-sizing: border-box; }' \
         '.undecorated:not(.override-redirect) { border: 1px solid transparent; }' \
         >> /usr/share/xpra/www/css/client.css
 
