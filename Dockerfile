@@ -51,7 +51,16 @@ RUN mkdir -p "${WINEPREFIX}" && chown -R "${PUID}:${PGID}" "${WINEPREFIX}" \
     && rm -rf /tmp/wine-* \
     && chown -R "${PUID}:${PGID}" "${WINEPREFIX}"
 
-# Seed the initial Mp3tag config into /pw/initial/config so the entrypoint
+# Install core Windows fonts via winetricks:
+#  - corefonts: Arial, Courier New, Times New Roman, Verdana, etc.
+#  - tahoma: Tahoma (default Windows UI font, not part of corefonts)
+RUN wget -q https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
+        -O /usr/local/bin/winetricks \
+    && chmod +x /usr/local/bin/winetricks \
+    && gosu "${PUID}:${PGID}" xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
+        sh -c 'winetricks -q corefonts tahoma; wineserver -k 2>/dev/null; true' \
+    && rm -rf /tmp/wine-* /home/gwb/.cache/winetricks \
+    && chown -R "${PUID}:${PGID}" "${WINEPREFIX}"
 # can copy it to /mp3tag-web/config on first run (volume mount).
 # The silent installer may not create AppData/Mp3tag until first launch,
 # so we create the directory if it doesn't exist yet.
@@ -96,21 +105,14 @@ RUN mkdir -p /home/gwb/.xpra \
         >> /home/gwb/.xpra/xpra.conf \
     && chown -R "${PUID}:${PGID}" /home/gwb/.xpra
 
-# Fix window decorations for non-standard windows (Telegram CSD with decorations=0).
-# 1. JS: Patch _set_decorated so non-override-redirect undecorated windows are treated
-#    as decorated. This ensures the header bar is shown AND the mouse-click offset
-#    calculation includes the header height (fixing mouse misalignment).
-# 2. CSS: Fix .windowhead to use border-box sizing so that its border-bottom (1px) is
-#    included in the 30px height — otherwise update_offsets() under-counts by 1px.
-#    Also add a transparent border on undecorated non-OR windows for visual consistency.
-#    Override-redirect windows (menus, tooltips, popups) are left untouched.
-RUN WJS=/usr/share/xpra/www/js/Window.js && \
-    sed -i 's/_set_decorated(decorated){this.decorated=decorated;/_set_decorated(decorated){if(!decorated\&\&!this.override_redirect){decorated=true;}this.decorated=decorated;/' "$WJS" && \
-    sed -i 's/jQuery(this\.d_header)\.css("height")/jQuery(this.d_header).outerHeight()/' "$WJS" && \
-    printf '\n%s\n' \
-        '.windowhead { box-sizing: border-box; }' \
-        '.undecorated:not(.override-redirect) { border: 1px solid transparent; }' \
-        >> /usr/share/xpra/www/css/client.css
+# Fix window decorations for CSD apps like Telegram (decorations=0, non-override-redirect).
+# 1. JS: Patch _set_decorated so only non-Wine CSD windows get forced decoration.
+#    Wine windows (class-instance contains ".exe") keep native behavior — context menus,
+#    popups, and dialogs stay undecorated (no header bar added).
+# 2. JS: Use outerHeight() for header height to include border-bottom in offset calc.
+# 3. CSS: Fix .windowhead border-box sizing; transparent border for undecorated non-OR.
+COPY scripts/patch-xpra.py /tmp/patch-xpra.py
+RUN python3 /tmp/patch-xpra.py && rm /tmp/patch-xpra.py
 
 # Wrapper script to launch all apps (avoids arg-joining issue in start-app)
 COPY scripts/run-all.sh /pw/run-all.sh
